@@ -1,19 +1,21 @@
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * =============================================================
  * MAIN CLASS - HotelBookingApp
  * =============================================================
  *
- * Use Case 2: Basic Room Types & Static Availability
+ * Use Case 3: Centralized Room Inventory Management
  *
  * Description:
- * Demonstrates abstraction, inheritance, and basic room modeling
- * with static availability.
+ * Uses HashMap to manage room availability centrally.
  *
  * @author Developer
- * @version 2.1
+ * @version 3.1
  */
 
-// Abstract class
+// Abstract Room
 abstract class Room {
     int beds;
     int size;
@@ -32,67 +34,86 @@ abstract class Room {
         System.out.println("Beds: " + beds);
         System.out.println("Size: " + size + " sqft");
         System.out.println("Price per night: " + price);
-        System.out.println("Available: " + available + "\n");
+        System.out.println("Available Rooms: " + available + "\n");
     }
 }
 
-// Single Room
+// Room Types
 class SingleRoom extends Room {
-    SingleRoom() {
-        super(1, 250, 1500.0);
-    }
-
-    String getRoomType() {
-        return "Single Room";
-    }
+    SingleRoom() { super(1, 250, 1500.0); }
+    String getRoomType() { return "Single Room"; }
 }
 
-// Double Room
 class DoubleRoom extends Room {
-    DoubleRoom() {
-        super(2, 400, 2500.0);
-    }
-
-    String getRoomType() {
-        return "Double Room";
-    }
+    DoubleRoom() { super(2, 400, 2500.0); }
+    String getRoomType() { return "Double Room"; }
 }
 
-// Suite Room
 class SuiteRoom extends Room {
-    SuiteRoom() {
-        super(3, 750, 5000.0);
+    SuiteRoom() { super(3, 750, 5000.0); }
+    String getRoomType() { return "Suite Room"; }
+}
+
+// ✅ Inventory Class (NEW CONCEPT)
+class RoomInventory {
+    private HashMap<String, Integer> inventory;
+
+    // Constructor
+    RoomInventory() {
+        inventory = new HashMap<>();
     }
 
-    String getRoomType() {
-        return "Suite Room";
+    // Add room type
+    void addRoom(String type, int count) {
+        inventory.put(type, count);
+    }
+
+    // Get availability
+    int getAvailability(String type) {
+        return inventory.getOrDefault(type, 0);
+    }
+
+    // Display all inventory
+    void displayInventory(Map<String, Room> roomMap) {
+        for (String type : inventory.keySet()) {
+            Room room = roomMap.get(type);
+            int available = inventory.get(type);
+            room.displayDetails(available);
+        }
     }
 }
 
-// Main class
+// Main Class
 public class HotelBookingApp {
 
     public static void main(String[] args) {
 
         System.out.println("=======================================");
-        System.out.println("      Hotel Room Initialization        ");
+        System.out.println("   Hotel Room Inventory Status         ");
         System.out.println("=======================================\n");
 
-        // Create room objects
+        // Create rooms
         Room single = new SingleRoom();
         Room doubleRoom = new DoubleRoom();
         Room suite = new SuiteRoom();
 
-        // Static availability
-        int singleAvailable = 5;
-        int doubleAvailable = 3;
-        int suiteAvailable = 2;
+        // Map room types → objects
+        Map<String, Room> roomMap = new HashMap<>();
+        roomMap.put("Single Room", single);
+        roomMap.put("Double Room", doubleRoom);
+        roomMap.put("Suite Room", suite);
 
-        // Display details
-        single.displayDetails(singleAvailable);
-        doubleRoom.displayDetails(doubleAvailable);
-        suite.displayDetails(suiteAvailable);
+        // Create inventory
+        RoomInventory inventory = new RoomInventory();
 
-        System.out.println("UC2 execution completed.");
+        // Add availability
+        inventory.addRoom("Single Room", 5);
+        inventory.addRoom("Double Room", 3);
+        inventory.addRoom("Suite Room", 2);
+
+        // Display
+        inventory.displayInventory(roomMap);
+
+        System.out.println("UC3 execution completed.");
     }
 }
