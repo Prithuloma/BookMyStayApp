@@ -6,13 +6,13 @@ import java.util.Map;
  * MAIN CLASS - HotelBookingApp
  * =============================================================
  *
- * Use Case 3: Centralized Room Inventory Management
+ * Use Case 4: Room Search & Availability Check
  *
  * Description:
- * Uses HashMap to manage room availability centrally.
+ * Allows users to search available rooms without modifying state.
  *
  * @author Developer
- * @version 3.1
+ * @version 4.0
  */
 
 // Abstract Room
@@ -54,31 +54,40 @@ class SuiteRoom extends Room {
     String getRoomType() { return "Suite Room"; }
 }
 
-// ✅ Inventory Class (NEW CONCEPT)
+// Inventory (READ ONLY used here)
 class RoomInventory {
-    private HashMap<String, Integer> inventory;
+    private HashMap<String, Integer> inventory = new HashMap<>();
 
-    // Constructor
-    RoomInventory() {
-        inventory = new HashMap<>();
-    }
-
-    // Add room type
     void addRoom(String type, int count) {
         inventory.put(type, count);
     }
 
-    // Get availability
     int getAvailability(String type) {
         return inventory.getOrDefault(type, 0);
     }
 
-    // Display all inventory
-    void displayInventory(Map<String, Room> roomMap) {
-        for (String type : inventory.keySet()) {
-            Room room = roomMap.get(type);
-            int available = inventory.get(type);
-            room.displayDetails(available);
+    // expose read-only map (safe usage)
+    Map<String, Integer> getAllRooms() {
+        return inventory;
+    }
+}
+
+// ✅ Search Service (NEW CONCEPT)
+class RoomSearchService {
+
+    void searchAvailableRooms(RoomInventory inventory, Map<String, Room> roomMap) {
+
+        System.out.println("Available Rooms:\n");
+
+        for (String type : inventory.getAllRooms().keySet()) {
+
+            int available = inventory.getAvailability(type);
+
+            // ✅ filter unavailable rooms
+            if (available > 0) {
+                Room room = roomMap.get(type);
+                room.displayDetails(available);
+            }
         }
     }
 }
@@ -89,7 +98,7 @@ public class HotelBookingApp {
     public static void main(String[] args) {
 
         System.out.println("=======================================");
-        System.out.println("   Hotel Room Inventory Status         ");
+        System.out.println("     Room Search & Availability        ");
         System.out.println("=======================================\n");
 
         // Create rooms
@@ -97,23 +106,23 @@ public class HotelBookingApp {
         Room doubleRoom = new DoubleRoom();
         Room suite = new SuiteRoom();
 
-        // Map room types → objects
         Map<String, Room> roomMap = new HashMap<>();
         roomMap.put("Single Room", single);
         roomMap.put("Double Room", doubleRoom);
         roomMap.put("Suite Room", suite);
 
-        // Create inventory
+        // Inventory setup
         RoomInventory inventory = new RoomInventory();
-
-        // Add availability
         inventory.addRoom("Single Room", 5);
         inventory.addRoom("Double Room", 3);
         inventory.addRoom("Suite Room", 2);
+        // try putting 0 to test filtering:
+        // inventory.addRoom("Suite Room", 0);
 
-        // Display
-        inventory.displayInventory(roomMap);
+        // ✅ Search (read-only)
+        RoomSearchService searchService = new RoomSearchService();
+        searchService.searchAvailableRooms(inventory, roomMap);
 
-        System.out.println("UC3 execution completed.");
+        System.out.println("UC4 search completed.");
     }
 }
