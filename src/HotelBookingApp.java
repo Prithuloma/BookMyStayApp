@@ -1,3 +1,4 @@
+import java.io.*;
 import java.util.*;
 
 /**
@@ -5,106 +6,87 @@ import java.util.*;
  * MAIN CLASS - HotelBookingApp
  * =============================================================
  *
- * Use Case 11: Concurrent Booking Simulation (Thread Safety)
+ * Use Case 12: Data Persistence & System Recovery
  *
  * Description:
- * Simulates concurrent booking requests using threads and
- * ensures safe allocation using synchronization.
+ * Saves and restores inventory + booking state using serialization.
  *
  * @author Developer
- * @version 11.0
+ * @version 12.0
  */
 
 // ---------- Reservation ----------
-class Reservation {
+class Reservation implements Serializable {
+    String reservationId;
     String guestName;
     String roomType;
+    String roomId;
 
-    Reservation(String guestName, String roomType) {
+    Reservation(String reservationId, String guestName, String roomType, String roomId) {
+        this.reservationId = reservationId;
         this.guestName = guestName;
         this.roomType = roomType;
+        this.roomId = roomId;
     }
 }
 
-// ---------- Inventory (Thread-safe methods) ----------
-class RoomInventory {
-    private Map<String, Integer> inventory = new HashMap<>();
+// ---------- Inventory ----------
+class RoomInventory implements Serializable {
+    Map<String, Integer> inventory = new HashMap<>();
 
     void addRoom(String type, int count) {
         inventory.put(type, count);
     }
 
-    // synchronized → critical section
-    synchronized boolean allocateRoom(String type) {
-
-        int available = inventory.getOrDefault(type, 0);
-
-        if (available > 0) {
-            inventory.put(type, available - 1);
-            return true;
-        }
-        return false;
+    void reduceRoom(String type) {
+        inventory.put(type, inventory.get(type) - 1);
     }
 
-    synchronized int getAvailability(String type) {
-        return inventory.getOrDefault(type, 0);
+    Map<String, Integer> getAll() {
+        return inventory;
     }
 }
 
-// ---------- Shared Queue ----------
-class BookingQueue {
-    private Queue<Reservation> queue = new LinkedList<>();
+// ---------- System State (NEW) ----------
+class SystemState implements Serializable {
+    RoomInventory inventory;
+    List<Reservation> bookings;
 
-    synchronized void add(Reservation r) {
-        queue.offer(r);
-    }
-
-    synchronized Reservation get() {
-        return queue.poll();
-    }
-}
-
-// ---------- Worker Thread ----------
-class BookingProcessor extends Thread {
-
-    private BookingQueue queue;
-    private RoomInventory inventory;
-    private static int idCounter = 1;
-
-    BookingProcessor(String name, BookingQueue queue, RoomInventory inventory) {
-        super(name);
-        this.queue = queue;
+    SystemState(RoomInventory inventory, List<Reservation> bookings) {
         this.inventory = inventory;
+        this.bookings = bookings;
+    }
+}
+
+// ---------- Persistence Service ----------
+class PersistenceService {
+
+    private static final String FILE_NAME = "hotel_state.ser";
+
+    // SAVE
+    void save(SystemState state) {
+        try (ObjectOutputStream out =
+                     new ObjectOutputStream(new FileOutputStream(FILE_NAME))) {
+
+            out.writeObject(state);
+            System.out.println("State saved successfully.");
+
+        } catch (IOException e) {
+            System.out.println("ERROR saving state: " + e.getMessage());
+        }
     }
 
-    public void run() {
+    // LOAD
+    SystemState load() {
+        try (ObjectInputStream in =
+                     new ObjectInputStream(new FileInputStream(FILE_NAME))) {
 
-        while (true) {
+            System.out.println("State loaded successfully.");
+            return (SystemState) in.readObject();
 
-            Reservation r;
-
-            // synchronized access to queue
-            synchronized (queue) {
-                r = queue.get();
-            }
-
-            if (r == null) break;
-
-            // critical section for allocation
-            boolean success = inventory.allocateRoom(r.roomType);
-
-            if (success) {
-                String roomId = r.roomType.substring(0, 2).toUpperCase() + (idCounter++);
-
-                System.out.println(Thread.currentThread().getName() +
-                        " confirmed " + r.guestName +
-                        " | " + r.roomType +
-                        " | Room ID: " + roomId);
-            } else {
-                System.out.println(Thread.currentThread().getName() +
-                        " rejected " + r.guestName +
-                        " (No availability)");
-            }
+        } catch (Exception e) {
+            System.out.println("No previous state found. Starting fresh.");
+            return null;
         }
     }
 }
@@ -115,37 +97,47 @@ public class HotelBookingApp {
     public static void main(String[] args) {
 
         System.out.println("=======================================");
-        System.out.println("   Concurrent Booking Simulation       ");
+        System.out.println("   Data Persistence & Recovery (UC12)  ");
         System.out.println("=======================================\n");
 
-        // Shared inventory
-        RoomInventory inventory = new RoomInventory();
-        inventory.addRoom("Single Room", 2);
+        PersistenceService persistence = new PersistenceService();
 
-        // Shared queue
-        BookingQueue queue = new BookingQueue();
-        queue.add(new Reservation("Alice", "Single Room"));
-        queue.add(new Reservation("Bob", "Single Room"));
-        queue.add(new Reservation("Charlie", "Single Room"));
+        // Try loading previous state
+        SystemState state = persistence.load();
 
-        // Multiple threads
-        BookingProcessor t1 = new BookingProcessor("Thread-1", queue, inventory);
-        BookingProcessor t2 = new BookingProcessor("Thread-2", queue, inventory);
+        RoomInventory inventory;
+        List<Reservation> bookings;
 
-        t1.start();
-        t2.start();
+        if (state != null) {
+            inventory = state.inventory;
+            bookings = state.bookings;
 
-        // wait for completion
-        try {
-            t1.join();
-            t2.join();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+            System.out.println("\nRecovered Data:");
+            for (Reservation r : bookings) {
+                System.out.println(r.reservationId + " | " +
+                        r.guestName + " | " +
+                        r.roomType + " | " + r.roomId);
+            }
+
+        } else {
+            // Fresh start
+            inventory = new RoomInventory();
+            inventory.addRoom("Single Room", 2);
+
+            bookings = new ArrayList<>();
+
+            // Simulate booking
+            Reservation r1 = new Reservation("RES1", "Alice", "Single Room", "SI1");
+            bookings.add(r1);
+            inventory.reduceRoom("Single Room");
+
+            System.out.println("New booking created: " + r1.guestName);
         }
 
-        System.out.println("\nRemaining Rooms: " +
-                inventory.getAvailability("Single Room"));
+        // Save state before exit
+        SystemState newState = new SystemState(inventory, bookings);
+        persistence.save(newState);
 
-        System.out.println("\nUC11 concurrency completed.");
+        System.out.println("\nUC12 persistence completed.");
     }
 }
